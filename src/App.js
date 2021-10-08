@@ -1,91 +1,140 @@
-// import logo from './logo.svg';
 import {
-  createUserWithEmailAndPassword,
   getAuth,
-  GoogleAuthProvider,
   signInWithPopup,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  updateProfile,
 } from "firebase/auth";
 import { useState } from "react";
 import "./App.css";
 import initializeAuthentication from "./firebase/firebase.initialize";
 
 initializeAuthentication();
-
 const googleProvider = new GoogleAuthProvider();
 
 function App() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLogin, setIsLogin] = useState(false);
+
   const auth = getAuth();
-  const handleEmailOnChange = (e) => {
+
+  const handleGoogleSignIn = () => {
+    signInWithPopup(auth, googleProvider).then((result) => {
+      const user = result.user;
+      console.log(user);
+    });
+  };
+
+  const toggleLogin = (e) => {
+    setIsLogin(e.target.checked);
+  };
+
+  const handleNameChange = (e) => {
+    setName(e.target.value);
+  };
+  const handleEmailChange = (e) => {
     setEmail(e.target.value);
   };
-  const handlePasswordOnChange = (e) => {
+
+  const handlePasswordChange = (e) => {
     setPassword(e.target.value);
   };
-  const handleRegistration = (e) => {
-    console.log(email, password);
-    e.preventDefault();
 
+  const handleRegistration = (e) => {
+    e.preventDefault();
+    console.log(email, password);
     if (password.length < 6) {
-      setError("password must be at least 6 charecter");
+      setError("Password Must be at least 6 characters long.");
+      return;
+    }
+    if (!/(?=.*[A-Z].*[A-Z])/.test(password)) {
+      setError("Password Must contain 2 upper case");
       return;
     }
 
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed in
-        const user = userCredential.user;
-        console.log(user);
-        // ...
-        setError("");
-      })
-      .catch((error) => {
-        // const errorCode = error.code;
-        const errorMessage = error.message;
-        setError(errorMessage);
-        // ..
-      });
+    if (isLogin) {
+      processLogin(email, password);
+    } else {
+      registerNewUser(email, password);
+    }
   };
-  const handleGoogleSignin = () => {
-    signInWithPopup(auth, googleProvider)
+
+  const processLogin = (email, password) => {
+    signInWithEmailAndPassword(auth, email, password)
       .then((result) => {
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        // const credential = GoogleAuthProvider.credentialFromResult(result);
-        // const token = credential.accessToken;
-        // The signed-in user info.
         const user = result.user;
-        // ...
+        console.log(user);
         setError("");
       })
       .catch((error) => {
         setError(error.message);
-        // Handle Errors here.
-        // const errorCode = error.code;
-        // const errorMessage = error.message;
-        // // The email of the user's account used.
-        // const email = error.email;
-        // // The AuthCredential type that was used.
-        // const credential = GoogleAuthProvider.credentialFromError(error);
-        // ...
       });
   };
+
+  const registerNewUser = (email, password) => {
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((result) => {
+        const user = result.user;
+        console.log(user);
+        setError("");
+        verifyEmail();
+        setUserName();
+      })
+      .catch((error) => {
+        setError(error.message);
+      });
+  };
+
+  const setUserName = () => {
+    updateProfile(auth.currentUser, { displayName: name }).then((result) => {});
+  };
+
+  const verifyEmail = () => {
+    sendEmailVerification(auth.currentUser).then((result) => {
+      console.log(result);
+    });
+  };
+
+  const handleResetPassword = () => {
+    sendPasswordResetEmail(auth, email).then((result) => {});
+  };
+
   return (
-    <div className="mx-5 ">
-      <form
-        className="w-75 shadow border m-2 p-3 "
-        onSubmit={handleRegistration}
-      >
-        <h1 className="text-center text-primary">Signup form</h1>
-        <div className="row mb-3 mt-5 ">
+    <div className="mx-5">
+      <form onSubmit={handleRegistration}>
+        <h3 className="text-primary">
+          Please {isLogin ? "Login" : "Register"}
+        </h3>
+        {!isLogin && (
+          <div className="row mb-3">
+            <label htmlFor="inputName" className="col-sm-2 col-form-label">
+              Name
+            </label>
+            <div className="col-sm-10">
+              <input
+                type="text"
+                onBlur={handleNameChange}
+                className="form-control"
+                id="inputName"
+                placeholder="Your Name"
+              />
+            </div>
+          </div>
+        )}
+        <div className="row mb-3">
           <label htmlFor="inputEmail3" className="col-sm-2 col-form-label">
             Email
           </label>
           <div className="col-sm-10">
             <input
+              onBlur={handleEmailChange}
               type="email"
-              onBlur={handleEmailOnChange}
               className="form-control"
               id="inputEmail3"
               required
@@ -96,15 +145,12 @@ function App() {
           <label htmlFor="inputPassword3" className="col-sm-2 col-form-label">
             Password
           </label>
-          {/* Error message for password  */}
-
           <div className="col-sm-10">
-            <div className="text-danger">{error}</div>
             <input
               type="password"
+              onBlur={handlePasswordChange}
               className="form-control"
               id="inputPassword3"
-              onBlur={handlePasswordOnChange}
               required
             />
           </div>
@@ -113,29 +159,37 @@ function App() {
           <div className="col-sm-10 offset-sm-2">
             <div className="form-check">
               <input
+                onChange={toggleLogin}
                 className="form-check-input"
                 type="checkbox"
                 id="gridCheck1"
               />
               <label className="form-check-label" htmlFor="gridCheck1">
-                Example checkbox
+                Already Registered?
               </label>
             </div>
           </div>
-        </div>{" "}
-        <div className="d-flex justify-content-between">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            onClick={handleGoogleSignin}
-          >
-            Google Signin
-          </button>
-          <button type="submit" className="btn btn-primary">
-            Sign in
-          </button>
         </div>
+        <div className="row mb-3 text-danger">{error}</div>
+        <button type="submit" className="btn btn-primary">
+          {isLogin ? "Login" : "Register"}
+        </button>
+        <button
+          type="button"
+          onClick={handleResetPassword}
+          className="btn btn-secondary btn-sm"
+        >
+          Reset Password
+        </button>
       </form>
+      <br />
+      <br />
+      <br />
+      <div>--------------------------------</div>
+      <br />
+      <br />
+      <br />
+      <button onClick={handleGoogleSignIn}>Google Sign In</button>
     </div>
   );
 }
